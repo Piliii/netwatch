@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+
+# user-maintained real config — copy targets.example.toml to get started
+targets.toml
+
+# runtime state, not source
+.state.json
+.latest.json
+netwatch.log
+
+# internal Claude-session notes — names real domains/hostname, keep local
+CLAUDE.md

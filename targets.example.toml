@@ -1,0 +1,42 @@
+# netwatch config.
+#
+# Copy this file to targets.toml and edit the [[targets]] list below to add
+# whatever domains/services you want watched — this file is yours to
+# maintain, netwatch only reads it.
+#
+# Each target:
+#   name = short label shown in the report
+#   url  = full URL checked with an HTTP GET (redirects are followed)
+#   kind = "public"   — reachable from the open internet; checked whenever
+#                        the internet layer is up, using normal public DNS.
+#          "internal" — only reachable over your VPN (self-hosted dashboards
+#                        etc.); only checked once the vpn + vpn_dns layers
+#                        below are confirmed healthy, so a dead VPN is
+#                        reported as "VPN is down", not "20 sites are down".
+#
+# A target that isn't checked yet (upstream layer down) shows as "skipped",
+# not "down" — skipped doesn't count as a failure.
+
+[network]
+internet_probe  = "1.1.1.1"       # plain internet reachability (ICMP ping)
+dns_probe_host  = "cloudflare.com" # hostname resolved to test DNS itself
+vpn_interface   = "wg0"           # local network interface for the tunnel
+vpn_gateway     = "10.8.0.1"      # VPN peer/gateway to ping for tunnel health
+vpn_dns_server  = "10.8.0.1"      # DNS server only reachable via the VPN
+
+[[targets]]
+name = "example site"
+url  = "https://example.com"
+kind = "public"
+
+[[targets]]
+name = "internal dashboard (VPN only)"
+url  = "https://dashboard.internal.example"
+kind = "internal"
+
+# Add your own below, e.g.:
+#
+# [[targets]]
+# name = "portainer (internal)"
+# url  = "https://portainer.example.com"
+# kind = "internal"
