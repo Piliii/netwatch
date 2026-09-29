@@ -210,7 +210,9 @@ def run_checks(cfg: dict) -> list[CheckResult]:
 
     vpn_ok = False
     if vpn_gateway:
-        if interface_up(vpn_interface):
+        if not internet_ok:
+            results.append(CheckResult("vpn", False, "skipped: no internet", skipped=True, group="network"))
+        elif interface_up(vpn_interface):
             ok, latency = ping(vpn_gateway)
             detail = (
                 f"{vpn_interface} up, ping {vpn_gateway}"
@@ -227,7 +229,9 @@ def run_checks(cfg: dict) -> list[CheckResult]:
             results.append(CheckResult("vpn", False, detail, expected=rl, group="network"))
 
     if vpn_dns_server:
-        if vpn_ok:
+        if not internet_ok:
+            results.append(CheckResult("vpn_dns", False, "skipped: no internet", skipped=True, group="network"))
+        elif vpn_ok:
             ok, detail = resolve(dns_probe_host, server=vpn_dns_server)
             results.append(
                 CheckResult("vpn_dns", ok, f"resolve via {vpn_dns_server} -> {detail}", group="network")
@@ -550,27 +554,13 @@ def log_line(line: str):
         pass
 
 
-def vpn_action(interface: str, up: bool) -> tuple[bool, str]:
-    """Start/stop the wg-quick@<interface> systemd unit. Needs root, so this
-    shells out via `sudo -n` (non-interactive) rather than running the
-    service itself as root — relies on passwordless sudo already being
-    scoped to this exact systemctl invocation; `-n` makes a missing sudo
-    rule fail fast with a message instead of hanging on a password prompt
-    curses can't display."""
-    verb = "start" if up else "stop"
-    unit = f"wg-quick@{interface}"
-    try:
-        r = subprocess.run(
-            ["sudo", "-n", "systemctl", verb, unit],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if r.returncode == 0:
-            return True, f"{unit} {verb}ped" if verb == "stop" else f"{unit} started"
-        return False, (r.stderr or r.stdout or f"systemctl {verb} {unit} failed").strip()
-    except Exception as e:
-        return False, str(e)
+try:
+    # Optional, machine-local, not part of the public repo (see .gitignore) —
+    # sudoers scoping for the systemctl call is specific to one box. Its
+    # absence just means the TUI's u/d VPN controls don't appear.
+    from netwatch_vpn import vpn_action
+except ImportError:
+    vpn_action = None
 
 
 def status_of(r: CheckResult) -> str:
@@ -727,9 +717,9 @@ def run_tui(refresh: float, vpn_interface: str):
                     status_msg, status_until, pending_up = "cancelled", now + 2, None
             elif key in (ord("q"), ord("Q"), 27):  # 27 = Esc
                 break
-            elif key in (ord("d"), ord("D")):
+            elif vpn_action is not None and key in (ord("d"), ord("D")):
                 pending_up = False
-            elif key in (ord("u"), ord("U")):
+            elif vpn_action is not None and key in (ord("u"), ord("U")):
                 pending_up = True
             elif key in (ord("c"), ord("C")):
                 domain = _prompt(stdscr, "Domain to check (Enter to cancel): ")
@@ -844,9 +834,10 @@ def run_tui(refresh: float, vpn_interface: str):
             elif status_msg and now < status_until:
                 _safe_addstr(stdscr, h - 2, 0, f" {status_msg} ".ljust(w - 1), curses.A_BOLD)
 
+            vpn_keys = "u: vpn up  d: vpn down  " if vpn_action is not None else ""
             _safe_addstr(
                 stdscr, h - 1, 0,
-                " q: quit  u: vpn up  d: vpn down  c: check domain  i: check ip  t: hops (mtr) ".ljust(w - 1),
+                f" q: quit  {vpn_keys}c: check domain  i: check ip  t: hops (mtr) ".ljust(w - 1),
                 curses.A_REVERSE,
             )
             stdscr.refresh()

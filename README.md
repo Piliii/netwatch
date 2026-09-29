@@ -3,8 +3,7 @@
 A local, layered network + service health monitor. Single Python script, no
 external dependencies (stdlib only — `tomllib`, `curses`, `urllib`,
 `subprocess`). Runs as a `systemd --user` service; the monitoring/check path
-itself needs no root. The `--tui`'s VPN up/down action is the one exception
-— see below.
+needs no root, and neither does anything else in this repo.
 
 ## Why
 
@@ -143,16 +142,14 @@ Checks render in two labeled sections: **Network**
 (`internet`/`dns`/`vpn`/`vpn_dns` — the fixed layer cascade) and **Targets**
 (everything from `targets.toml`).
 
-`u`/`U` and `d`/`D` bring/take the VPN up or down (`systemctl start/stop
-wg-quick@<vpn_interface>`), each gated behind a `y`/`n` confirm prompt so a
-stray keystroke can't drop the tunnel. This is the one place netwatch needs
-root: it shells out via `sudo -n systemctl ...` — `-n` (non-interactive)
-means it fails fast with an error shown in the TUI rather than hanging on a
-password prompt curses can't render. Requires a passwordless sudoers rule
-scoped to exactly `systemctl start/stop wg-quick@<interface>` on your
-machine; without it every attempt fails cleanly. Every attempt (success or
-failure) is written to `netwatch.log` as an `ACTION` line, same as automatic
-up/down transitions.
+If a local, gitignored `netwatch_vpn.py` defining `vpn_action(interface: str,
+up: bool) -> tuple[bool, str]` is present next to `netwatch.py`, the TUI also
+exposes `u`/`U` and `d`/`D` to bring the VPN up/down, each gated behind a
+`y`/`n` confirm prompt. This is left out of the repo on purpose — actually
+starting/stopping a VPN interface needs a root-capable action (e.g.
+passwordless `sudo` scoped to one exact `systemctl` unit), which is
+inherently specific to one machine's setup rather than something to ship as
+a generic default. Without that file, the `u`/`d` keys simply don't appear.
 
 `c`/`C`, `i`/`I`, and `t`/`T` run the three ad hoc checks below
 (`--check-domain`, `--check-ip`, `--mtr`) against a domain/IP/host typed in

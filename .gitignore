@@ -11,3 +11,6 @@ netwatch.log
 
 # internal Claude-session notes — names real domains/hostname, keep local
 CLAUDE.md
+
+# machine-specific VPN control (sudo scoped to this exact box) — local only
+netwatch_vpn.py
