@@ -699,8 +699,14 @@ def run_tui(refresh: float, vpn_interface: str):
         status_until = 0.0
         overlay: list[tuple[str, int]] | None = None  # set by c/i/t, cleared by any keypress
 
+        first_iteration = True
         while True:
-            key = stdscr.getch()
+            # getch() blocks for up to `refresh` seconds when no key is
+            # pressed (that's what drives the periodic redraw) — but that
+            # would also delay the very first frame by a full `refresh`
+            # interval before anything appears on screen. Skip the wait once.
+            key = -1 if first_iteration else stdscr.getch()
+            first_iteration = False
             now = time.monotonic()
 
             if overlay is not None:
